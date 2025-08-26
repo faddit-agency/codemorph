@@ -6,6 +6,7 @@ import { useState } from "react";
 import SearchDialog from "@/components/SearchDialog";
 import MobileMenu from "@/components/MobileMenu";
 import LoginDialog from "@/components/LoginDialog";
+import RegisterDialog from "@/components/RegisterDialog";
 import CartSidebar from "@/components/CartSidebar";
 import { useCart } from "@/contexts/CartContext";
 
@@ -13,6 +14,7 @@ export default function Header() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
+  const [registerOpen, setRegisterOpen] = useState(false);
   
   const { items, isOpen, openCart, closeCart, updateQuantity, removeItem, getTotalItems } = useCart();
   
@@ -57,7 +59,16 @@ export default function Header() {
       
       <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
       <MobileMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
-      <LoginDialog open={loginOpen} onClose={() => setLoginOpen(false)} />
+      <LoginDialog 
+        open={loginOpen} 
+        onClose={() => setLoginOpen(false)} 
+        onOpenRegister={() => setRegisterOpen(true)}
+      />
+      <RegisterDialog 
+        open={registerOpen} 
+        onClose={() => setRegisterOpen(false)} 
+        onOpenLogin={() => setLoginOpen(true)}
+      />
       <CartSidebar 
         open={isOpen} 
         onClose={closeCart} 

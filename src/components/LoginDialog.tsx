@@ -5,9 +5,10 @@ import { useEffect, useState } from "react";
 type LoginDialogProps = {
   open: boolean;
   onClose: () => void;
+  onOpenRegister?: () => void;
 };
 
-export default function LoginDialog({ open, onClose }: LoginDialogProps) {
+export default function LoginDialog({ open, onClose, onOpenRegister }: LoginDialogProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -110,7 +111,13 @@ export default function LoginDialog({ open, onClose }: LoginDialogProps) {
                 Reset password
               </button>
               <div>
-                <button className="text-black hover:underline underline-offset-2">
+                <button 
+                  className="text-black hover:underline underline-offset-2"
+                  onClick={() => {
+                    onClose();
+                    onOpenRegister?.();
+                  }}
+                >
                   Register new account
                 </button>
               </div>
