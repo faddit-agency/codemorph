@@ -43,7 +43,7 @@ export default function Header() {
           />
         </Link>
 
-        {/* Right: Search, Login & Cart */}
+        {/* Right: Search, Login, Shipping & Cart */}
         <div className="flex items-center gap-4 text-sm">
           <button aria-label="Search" className="hover:underline" onClick={() => setSearchOpen(true)}>
             Search
@@ -51,6 +51,9 @@ export default function Header() {
           <button aria-label="Login" className="hover:underline" onClick={() => setLoginOpen(true)}>
             Login
           </button>
+          <Link href="/shipping" className="hover:underline">
+            배송조회
+          </Link>
           <button onClick={openCart} className="hover:underline">
             Cart ({getTotalItems()})
           </button>
