@@ -53,6 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // 로그인
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const login = async (email: string, password: string) => {
     try {
       // 실제 구현에서는 Supabase Auth를 사용

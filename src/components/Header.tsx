@@ -18,7 +18,7 @@ export default function Header() {
   const [registerOpen, setRegisterOpen] = useState(false);
   
   const { items, isOpen, openCart, closeCart, updateQuantity, removeItem, getTotalItems } = useCart();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   
   return (
     <header className="border-b border-black/10 sticky top-0 bg-white z-50">

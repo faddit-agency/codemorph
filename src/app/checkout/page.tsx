@@ -29,7 +29,7 @@ export default function CheckoutPage() {
     address: "",
     phone: "",
   });
-  const [isPhoneVerified, setIsPhoneVerified] = useState(false);
+
 
   // 로그인한 사용자 정보로 폼 초기화
   useEffect(() => {
@@ -39,7 +39,7 @@ export default function CheckoutPage() {
         email: user.email,
         phone: user.phone,
       }));
-      setIsPhoneVerified(user.phone_verified);
+
     }
   }, [user]);
 
@@ -69,7 +69,6 @@ export default function CheckoutPage() {
 
   const handlePhoneVerified = (phone: string) => {
     setCustomerInfo(prev => ({ ...prev, phone }));
-    setIsPhoneVerified(true);
   };
 
   if (items.length === 0) {

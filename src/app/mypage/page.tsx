@@ -85,7 +85,7 @@ export default function MyPage() {
     setIsUpdatingId(true);
     try {
       // 아이디 중복 검사
-      const { data: existingUser, error: checkError } = await supabase
+      const { data: existingUser } = await supabase
         .from('users')
         .select('id')
         .eq('consumer_id', newConsumerId.trim())

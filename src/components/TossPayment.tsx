@@ -9,8 +9,10 @@ declare global {
         widgets: (options: { customerKey: string }) => {
           setAmount: (amount: { currency: string; value: number }) => Promise<void>;
           renderPaymentMethods: (options: { selector: string }) => Promise<{
-            on: (event: string, callback: (data: any) => void) => void;
-            getSelectedPaymentMethod: () => Promise<any>;
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          on: (event: string, callback: (data: any) => void) => void;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          getSelectedPaymentMethod: () => Promise<any>;
             destroy: () => Promise<void>;
           }>;
           requestPayment: (options: {
@@ -63,9 +65,13 @@ export default function TossPayment({
   const [isPaymentReady, setIsPaymentReady] = useState(false);
   const [isAgreementReady, setIsAgreementReady] = useState(false);
   const [canPay, setCanPay] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const widgetsRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const paymentMethodWidgetRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const agreementWidgetRef = useRef<any>(null);
 
   // 고유한 customerKey 생성 (실제로는 사용자 ID나 세션 ID를 사용해야 함)
@@ -74,7 +80,8 @@ export default function TossPayment({
   // 토스페이먼츠 SDK 로드
   useEffect(() => {
     // 이미 로드된 경우 스킵
-    if (window.TossPayments) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (typeof window !== 'undefined' && (window as any).TossPayments) {
       setIsLoaded(true);
       return;
     }
@@ -101,12 +108,14 @@ export default function TossPayment({
 
   // 결제위젯 초기화
   useEffect(() => {
-    if (!isLoaded || !window.TossPayments) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (!isLoaded || !(window as any).TossPayments) return;
 
     const clientKey = "test_gck_docs_Ovk5rk1EwkEbP0W43n07xlzm"; // 결제위젯 연동 테스트 키 (Widget Client Key)
 
     try {
-      const tossPayments = window.TossPayments(clientKey);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const tossPayments = (window as any).TossPayments(clientKey);
       
       // 결제위젯 초기화
       const widgets = tossPayments.widgets({
@@ -158,6 +167,7 @@ export default function TossPayment({
         paymentMethodWidgetRef.current = paymentMethodWidget;
 
         // 결제 수단 선택 이벤트 리스너
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         paymentMethodWidget.on("paymentMethodSelect", (selectedPaymentMethod: any) => {
           console.log("선택된 결제 수단:", selectedPaymentMethod);
           setSelectedPaymentMethod(selectedPaymentMethod);
@@ -189,6 +199,7 @@ export default function TossPayment({
         agreementWidgetRef.current = agreementWidget;
 
         // 약관 동의 상태 변경 이벤트 리스너
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         agreementWidget.on("agreementStatusChange", (agreementStatus: any) => {
           console.log("약관 동의 상태:", agreementStatus);
           setCanPay(agreementStatus.agreedRequiredTerms && selectedPaymentMethod !== null);
@@ -202,7 +213,7 @@ export default function TossPayment({
     };
 
     renderAgreement();
-  }, [isPaymentReady, onFail]);
+  }, [isPaymentReady, onFail, selectedPaymentMethod]);
 
   const handlePayment = async () => {
     if (!widgetsRef.current || !isPaymentReady) {
