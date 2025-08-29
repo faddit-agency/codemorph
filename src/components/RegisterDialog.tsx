@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import PhoneVerification from "./PhoneVerification";
+import { useAuth } from "@/contexts/AuthContext";
 
 type RegisterDialogProps = {
   open: boolean;
@@ -10,14 +12,19 @@ type RegisterDialogProps = {
 };
 
 export default function RegisterDialog({ open, onClose, onOpenLogin }: RegisterDialogProps) {
+  const { register } = useAuth();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
     email: "",
     password: "",
+    phone: "",
+    consumerId: "",
     newsletter: false,
     terms: false,
   });
+  const [isPhoneVerified, setIsPhoneVerified] = useState(false);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -44,11 +51,48 @@ export default function RegisterDialog({ open, onClose, onOpenLogin }: RegisterD
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handlePhoneVerified = (phone: string) => {
+    setFormData(prev => ({ ...prev, phone }));
+    setIsPhoneVerified(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // 회원가입 로직은 여기에 구현
-    console.log("Register attempt:", formData);
-    onClose();
+    
+    if (!isPhoneVerified) {
+      alert("휴대폰 번호 인증을 완료해주세요.");
+      return;
+    }
+
+    if (!formData.consumerId.trim()) {
+      alert("아이디를 입력해주세요.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    
+    try {
+      const result = await register({
+        email: formData.email,
+        password: formData.password,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        phone: formData.phone,
+        consumerId: formData.consumerId.trim(),
+      });
+
+      if (result.success) {
+        alert("회원가입이 완료되었습니다!");
+        onClose();
+      } else {
+        alert(result.error || "회원가입에 실패했습니다.");
+      }
+    } catch (error) {
+      console.error("회원가입 오류:", error);
+      alert("회원가입 중 오류가 발생했습니다.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -140,6 +184,32 @@ export default function RegisterDialog({ open, onClose, onOpenLogin }: RegisterD
                 />
               </div>
 
+              <div>
+                <label htmlFor="consumerId" className="block text-sm font-medium mb-2">
+                  아이디 *
+                </label>
+                <input
+                  id="consumerId"
+                  type="text"
+                  value={formData.consumerId}
+                  onChange={(e) => handleInputChange("consumerId", e.target.value)}
+                  className="w-full border border-black/15 px-3 py-2 text-sm focus:outline-none focus:border-black font-mono"
+                  placeholder="원하는 아이디를 입력하세요"
+                  required
+                />
+              </div>
+
+              {/* 휴대폰 번호 인증 */}
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  휴대폰 번호 *
+                </label>
+                <PhoneVerification
+                  onVerified={handlePhoneVerified}
+                  isRequired={true}
+                />
+              </div>
+
               <div className="space-y-3 pt-2">
                 <label className="flex items-start space-x-3 cursor-pointer">
                   <input
@@ -177,9 +247,14 @@ export default function RegisterDialog({ open, onClose, onOpenLogin }: RegisterD
 
               <button
                 type="submit"
-                className="w-full bg-black text-white py-3 text-sm font-medium hover:bg-black/90 transition-colors mt-6"
+                disabled={!isPhoneVerified || isSubmitting}
+                className={`w-full py-3 text-sm font-medium transition-colors mt-6 ${
+                  isPhoneVerified && !isSubmitting
+                    ? "bg-black text-white hover:bg-black/90"
+                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                }`}
               >
-                REGISTER
+                {isSubmitting ? "처리 중..." : isPhoneVerified ? "REGISTER" : "휴대폰 인증을 완료해주세요"}
               </button>
             </form>
 

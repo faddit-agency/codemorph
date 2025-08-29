@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 
 type LoginDialogProps = {
   open: boolean;
@@ -9,8 +10,11 @@ type LoginDialogProps = {
 };
 
 export default function LoginDialog({ open, onClose, onOpenRegister }: LoginDialogProps) {
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -30,11 +34,25 @@ export default function LoginDialog({ open, onClose, onOpenRegister }: LoginDial
 
   if (!open) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // 로그인 로직은 여기에 구현
-    console.log("Login attempt:", { email, password });
-    onClose();
+    setError("");
+    setIsSubmitting(true);
+
+    try {
+      const result = await login(email, password);
+      
+      if (result.success) {
+        onClose();
+      } else {
+        setError(result.error || "로그인에 실패했습니다.");
+      }
+    } catch (error) {
+      console.error("로그인 오류:", error);
+      setError("로그인 중 오류가 발생했습니다.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -98,11 +116,22 @@ export default function LoginDialog({ open, onClose, onOpenRegister }: LoginDial
                 />
               </div>
 
+              {error && (
+                <div className="text-red-600 text-sm text-center">
+                  {error}
+                </div>
+              )}
+              
               <button
                 type="submit"
-                className="w-full bg-black text-white py-3 text-sm font-medium hover:bg-black/90 transition-colors"
+                disabled={isSubmitting}
+                className={`w-full py-3 text-sm font-medium transition-colors ${
+                  isSubmitting
+                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    : "bg-black text-white hover:bg-black/90"
+                }`}
               >
-                SIGN IN
+                {isSubmitting ? "로그인 중..." : "SIGN IN"}
               </button>
             </form>
 

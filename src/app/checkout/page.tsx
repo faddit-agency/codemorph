@@ -1,18 +1,47 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense, useEffect } from "react";
 import Link from "next/link";
 import { useCart } from "@/contexts/CartContext";
-import TossPayment from "@/components/TossPayment";
+import { useAuth } from "@/contexts/AuthContext";
+import dynamic from "next/dynamic";
+import PhoneVerification from "@/components/PhoneVerification";
+
+const TossPayment = dynamic(() => import("@/components/TossPayment"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center p-8">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black mx-auto mb-4"></div>
+        <p className="text-sm text-gray-600">결제 시스템을 불러오는 중...</p>
+      </div>
+    </div>
+  ),
+});
 
 export default function CheckoutPage() {
   const { items, getTotalItems } = useCart();
+  const { user } = useAuth();
   const [customerInfo, setCustomerInfo] = useState({
     email: "",
     firstName: "",
     lastName: "",
     address: "",
+    phone: "",
   });
+  const [isPhoneVerified, setIsPhoneVerified] = useState(false);
+
+  // 로그인한 사용자 정보로 폼 초기화
+  useEffect(() => {
+    if (user) {
+      setCustomerInfo(prev => ({
+        ...prev,
+        email: user.email,
+        phone: user.phone,
+      }));
+      setIsPhoneVerified(user.phone_verified);
+    }
+  }, [user]);
 
   // 주문 총액 계산
   const subtotal = items.reduce((sum, item) => {
@@ -36,6 +65,11 @@ export default function CheckoutPage() {
   const handlePaymentFail = (error: unknown) => {
     console.error("결제 실패:", error);
     alert("결제에 실패했습니다. 다시 시도해주세요.");
+  };
+
+  const handlePhoneVerified = (phone: string) => {
+    setCustomerInfo(prev => ({ ...prev, phone }));
+    setIsPhoneVerified(true);
   };
 
   if (items.length === 0) {
@@ -111,20 +145,58 @@ export default function CheckoutPage() {
                       required
                     />
                   </div>
+
+                  {/* 휴대폰 번호 인증 */}
+                  <div className="mt-6">
+                    <h3 className="text-lg font-medium mb-4">휴대폰 번호 인증</h3>
+                    {user && user.phone_verified ? (
+                      <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="flex items-center">
+                          <svg className="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span className="text-green-800">
+                            인증된 휴대폰 번호: {user.phone}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <PhoneVerification
+                        onVerified={handlePhoneVerified}
+                        initialPhone={user?.phone || ""}
+                        isRequired={true}
+                      />
+                    )}
+                  </div>
                 </form>
               </div>
 
               {/* 결제 위젯 */}
               <div>
                 <h2 className="text-xl font-medium mb-4">결제</h2>
-                <TossPayment
-                  amount={total}
-                  orderId={orderId}
-                  orderName={`CODEMORPH 상품 ${getTotalItems()}건`}
-                  customerEmail={customerInfo.email}
-                  customerName={`${customerInfo.firstName} ${customerInfo.lastName}`}
-                  onFail={handlePaymentFail}
-                />
+                <Suspense fallback={
+                  <div className="flex items-center justify-center p-8">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black mx-auto mb-4"></div>
+                      <p className="text-sm text-gray-600">결제 시스템을 불러오는 중...</p>
+                    </div>
+                  </div>
+                }>
+                                    <TossPayment
+                    amount={total}
+                    orderId={orderId}
+                    orderName={`CODEMORPH 상품 ${getTotalItems()}건`}
+                    customerEmail={customerInfo.email}
+                    customerName={`${customerInfo.firstName} ${customerInfo.lastName}`}
+                    customerPhone={customerInfo.phone}
+                    onSuccess={(paymentData) => {
+                      console.log("결제 성공:", paymentData);
+                      // 여기서 결제 승인 API를 호출하거나 성공 페이지로 이동
+                      window.location.href = `http://localhost:3000/success?paymentKey=${paymentData.paymentKey}&orderId=${paymentData.orderId}&amount=${paymentData.amount.value}`;
+                    }}
+                    onFail={handlePaymentFail}
+                  />
+                </Suspense>
               </div>
             </div>
 
@@ -181,16 +253,7 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              {/* 배송 안내 */}
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="font-medium mb-2">배송 안내</h3>
-                <ul className="text-sm text-gray-600 space-y-1">
-                  <li>• 배송비: 무료 (5만원 이상 주문 시)</li>
-                  <li>• 배송 기간: 1-2일 (영업일 기준)</li>
-                  <li>• 배송 업체: CJ대한통운</li>
-                  <li>• 배송 시작 시 SMS로 안내</li>
-                </ul>
-              </div>
+
             </div>
           </div>
         </div>

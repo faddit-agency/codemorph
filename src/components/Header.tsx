@@ -9,6 +9,7 @@ import LoginDialog from "@/components/LoginDialog";
 import RegisterDialog from "@/components/RegisterDialog";
 import CartSidebar from "@/components/CartSidebar";
 import { useCart } from "@/contexts/CartContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Header() {
   const [searchOpen, setSearchOpen] = useState(false);
@@ -17,6 +18,7 @@ export default function Header() {
   const [registerOpen, setRegisterOpen] = useState(false);
   
   const { items, isOpen, openCart, closeCart, updateQuantity, removeItem, getTotalItems } = useCart();
+  const { user, logout } = useAuth();
   
   return (
     <header className="border-b border-black/10 sticky top-0 bg-white z-50">
@@ -48,9 +50,19 @@ export default function Header() {
           <button aria-label="Search" className="hover:underline" onClick={() => setSearchOpen(true)}>
             Search
           </button>
-          <button aria-label="Login" className="hover:underline" onClick={() => setLoginOpen(true)}>
-            Login
-          </button>
+          {user ? (
+            <Link href="/mypage" className="flex items-center">
+              <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center hover:bg-gray-400 transition-colors">
+                <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                </svg>
+              </div>
+            </Link>
+          ) : (
+            <button aria-label="Login" className="hover:underline" onClick={() => setLoginOpen(true)}>
+              Login
+            </button>
+          )}
           <Link href="/shipping" className="hover:underline">
             배송조회
           </Link>

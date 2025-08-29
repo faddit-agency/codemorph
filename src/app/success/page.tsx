@@ -11,6 +11,8 @@ function PaymentSuccessContent() {
     orderId: string;
     amount: number;
     status: string;
+    customerPhone?: string;
+    customerName?: string;
   } | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -19,15 +21,77 @@ function PaymentSuccessContent() {
     const paymentKey = searchParams.get("paymentKey");
     const orderId = searchParams.get("orderId");
     const amount = searchParams.get("amount");
+    const customerPhone = searchParams.get("phone");
+    const customerName = searchParams.get("name");
 
     if (paymentKey && orderId && amount) {
-      // 실제 구현에서는 서버에 결제 승인 요청을 보내야 합니다
-      setPaymentData({
-        paymentKey,
-        orderId,
-        amount: parseInt(amount),
-        status: "DONE",
-      });
+      // 결제 승인 API 호출
+      const confirmPayment = async () => {
+        try {
+          const response = await fetch('/api/payment/confirm', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              paymentKey,
+              orderId,
+              amount: parseInt(amount),
+            }),
+          });
+
+          const result = await response.json();
+
+          if (response.ok) {
+            setPaymentData({
+              paymentKey,
+              orderId,
+              amount: parseInt(amount),
+              status: result.status || "DONE",
+              customerPhone: customerPhone || undefined,
+              customerName: customerName || undefined,
+            });
+
+            // 결제 완료 SMS 발송
+            if (customerPhone) {
+              try {
+                await fetch('/api/sms/payment-complete', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    orderId,
+                    phone: customerPhone,
+                    amount: parseInt(amount),
+                    customerName: customerName || '고객',
+                  }),
+                });
+              } catch (error) {
+                console.error('결제 완료 SMS 발송 실패:', error);
+              }
+            }
+          } else {
+            console.error('결제 승인 실패:', result.error);
+            setPaymentData({
+              paymentKey,
+              orderId,
+              amount: parseInt(amount),
+              status: "FAILED",
+              customerPhone: customerPhone || undefined,
+              customerName: customerName || undefined,
+            });
+          }
+        } catch (error) {
+          console.error('결제 승인 API 호출 실패:', error);
+          setPaymentData({
+            paymentKey,
+            orderId,
+            amount: parseInt(amount),
+            status: "FAILED",
+          });
+        }
+      };
+
+      confirmPayment();
     }
     setLoading(false);
   }, [searchParams]);

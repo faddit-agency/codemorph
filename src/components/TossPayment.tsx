@@ -8,16 +8,24 @@ declare global {
       (clientKey: string): {
         widgets: (options: { customerKey: string }) => {
           setAmount: (amount: { currency: string; value: number }) => Promise<void>;
-          renderPaymentMethods: (options: { selector: string; variantKey: string }) => Promise<unknown>;
-          renderAgreement: (options: { selector: string; variantKey: string }) => Promise<unknown>;
+          renderPaymentMethods: (options: { selector: string }) => Promise<{
+            on: (event: string, callback: (data: any) => void) => void;
+            getSelectedPaymentMethod: () => Promise<any>;
+            destroy: () => Promise<void>;
+          }>;
           requestPayment: (options: {
             orderId: string;
             orderName: string;
-            successUrl: string;
-            failUrl: string;
             customerEmail: string;
             customerName: string;
-          }) => Promise<void>;
+            successUrl?: string;
+            failUrl?: string;
+          }) => Promise<{
+            paymentType: string;
+            paymentKey: string;
+            orderId: string;
+            amount: { value: number; currency: string };
+          }>;
         };
       };
       ANONYMOUS: string;
@@ -31,7 +39,13 @@ type TossPaymentProps = {
   orderName: string;
   customerEmail: string;
   customerName: string;
-  onSuccess: (paymentData: unknown) => void;
+  customerPhone?: string;
+  onSuccess?: (paymentData: {
+    paymentType: string;
+    paymentKey: string;
+    orderId: string;
+    amount: { value: number; currency: string };
+  }) => void;
   onFail: (error: unknown) => void;
 };
 
@@ -41,104 +55,187 @@ export default function TossPayment({
   orderName,
   customerEmail,
   customerName,
+  customerPhone,
+  onSuccess,
   onFail,
-}: Omit<TossPaymentProps, 'onSuccess'>) {
+}: TossPaymentProps) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [isPaymentReady, setIsPaymentReady] = useState(false);
-  const paymentWidgetRef = useRef<{
-    setAmount: (amount: { currency: string; value: number }) => Promise<void>;
-    renderPaymentMethods: (options: { selector: string; variantKey: string }) => Promise<unknown>;
-    renderAgreement: (options: { selector: string; variantKey: string }) => Promise<unknown>;
-    requestPayment: (options: {
-      orderId: string;
-      orderName: string;
-      successUrl: string;
-      failUrl: string;
-      customerEmail: string;
-      customerName: string;
-    }) => Promise<void>;
-  } | null>(null);
-  const paymentMethodsWidgetRef = useRef<unknown>(null);
-  const agreementWidgetRef = useRef<unknown>(null);
+  const [isAgreementReady, setIsAgreementReady] = useState(false);
+  const [canPay, setCanPay] = useState(false);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<any>(null);
+  const widgetsRef = useRef<any>(null);
+  const paymentMethodWidgetRef = useRef<any>(null);
+  const agreementWidgetRef = useRef<any>(null);
+
+  // 고유한 customerKey 생성 (실제로는 사용자 ID나 세션 ID를 사용해야 함)
+  const customerKey = `CUSTOMER_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
   // 토스페이먼츠 SDK 로드
   useEffect(() => {
+    // 이미 로드된 경우 스킵
+    if (window.TossPayments) {
+      setIsLoaded(true);
+      return;
+    }
+
     const script = document.createElement("script");
     script.src = "https://js.tosspayments.com/v2/standard";
     script.async = true;
     script.onload = () => {
       setIsLoaded(true);
     };
+    script.onerror = () => {
+      console.error("토스페이먼츠 SDK 로드 실패");
+      onFail(new Error("토스페이먼츠 SDK 로드 실패"));
+    };
     document.head.appendChild(script);
 
     return () => {
-      document.head.removeChild(script);
+      const existingScript = document.querySelector('script[src="https://js.tosspayments.com/v2/standard"]');
+      if (existingScript) {
+        document.head.removeChild(existingScript);
+      }
     };
-  }, []);
+  }, [onFail]);
 
-  // 결제 위젯 초기화
+  // 결제위젯 초기화
   useEffect(() => {
     if (!isLoaded || !window.TossPayments) return;
 
-    const clientKey = "test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq"; // 테스트 키
+    const clientKey = "test_gck_docs_Ovk5rk1EwkEbP0W43n07xlzm"; // 결제위젯 연동 테스트 키 (Widget Client Key)
 
     try {
       const tossPayments = window.TossPayments(clientKey);
       
-      // 비회원 결제용 위젯 생성
+      // 결제위젯 초기화
       const widgets = tossPayments.widgets({
-        customerKey: window.TossPayments.ANONYMOUS,
+        customerKey: customerKey,
       });
 
-      paymentWidgetRef.current = widgets;
-
-      // 결제 금액 설정
-      widgets.setAmount({
-        currency: "KRW",
-        value: amount,
-      });
-
-      // 결제 수단 UI 렌더링
-      widgets
-        .renderPaymentMethods({
-          selector: "#payment-method",
-          variantKey: "DEFAULT",
-        })
-        .then((paymentMethodsWidget: unknown) => {
-          paymentMethodsWidgetRef.current = paymentMethodsWidget;
-        });
-
-      // 이용약관 UI 렌더링
-      widgets
-        .renderAgreement({
-          selector: "#agreement",
-          variantKey: "AGREEMENT",
-        })
-        .then((agreementWidget: unknown) => {
-          agreementWidgetRef.current = agreementWidget;
-          setIsPaymentReady(true);
-        });
+      widgetsRef.current = widgets;
+      setIsPaymentReady(true);
     } catch (error) {
       console.error("토스페이먼츠 초기화 실패:", error);
       onFail(error);
     }
-  }, [isLoaded, amount, onFail]);
+  }, [isLoaded, customerKey, onFail]);
+
+  // 결제 금액 설정
+  useEffect(() => {
+    if (!widgetsRef.current || !isPaymentReady) return;
+
+    const setAmount = async () => {
+      try {
+        await widgetsRef.current.setAmount({
+          currency: "KRW",
+          value: amount,
+        });
+      } catch (error) {
+        console.error("결제 금액 설정 실패:", error);
+        onFail(error);
+      }
+    };
+
+    setAmount();
+  }, [amount, isPaymentReady, onFail]);
+
+  // 결제 수단 UI 렌더링
+  useEffect(() => {
+    if (!widgetsRef.current || !isPaymentReady) return;
+
+    const renderPaymentMethods = async () => {
+      try {
+        // 기존 위젯이 있다면 제거
+        if (paymentMethodWidgetRef.current) {
+          await paymentMethodWidgetRef.current.destroy();
+        }
+
+        const paymentMethodWidget = await widgetsRef.current.renderPaymentMethods({
+          selector: "#payment-method-widget",
+        });
+
+        paymentMethodWidgetRef.current = paymentMethodWidget;
+
+        // 결제 수단 선택 이벤트 리스너
+        paymentMethodWidget.on("paymentMethodSelect", (selectedPaymentMethod: any) => {
+          console.log("선택된 결제 수단:", selectedPaymentMethod);
+          setSelectedPaymentMethod(selectedPaymentMethod);
+        });
+      } catch (error) {
+        console.error("결제 수단 UI 렌더링 실패:", error);
+        onFail(error);
+      }
+    };
+
+    renderPaymentMethods();
+  }, [isPaymentReady, onFail]);
+
+  // 약관 UI 렌더링
+  useEffect(() => {
+    if (!widgetsRef.current || !isPaymentReady) return;
+
+    const renderAgreement = async () => {
+      try {
+        // 기존 위젯이 있다면 제거
+        if (agreementWidgetRef.current) {
+          await agreementWidgetRef.current.destroy();
+        }
+
+        const agreementWidget = await widgetsRef.current.renderAgreement({
+          selector: "#agreement-widget",
+        });
+
+        agreementWidgetRef.current = agreementWidget;
+
+        // 약관 동의 상태 변경 이벤트 리스너
+        agreementWidget.on("agreementStatusChange", (agreementStatus: any) => {
+          console.log("약관 동의 상태:", agreementStatus);
+          setCanPay(agreementStatus.agreedRequiredTerms && selectedPaymentMethod !== null);
+        });
+
+        setIsAgreementReady(true);
+      } catch (error) {
+        console.error("약관 UI 렌더링 실패:", error);
+        onFail(error);
+      }
+    };
+
+    renderAgreement();
+  }, [isPaymentReady, onFail]);
 
   const handlePayment = async () => {
-    if (!paymentWidgetRef.current || !isPaymentReady) {
+    if (!widgetsRef.current || !isPaymentReady) {
       alert("결제 준비가 완료되지 않았습니다.");
       return;
     }
 
+    if (!selectedPaymentMethod) {
+      alert("결제 수단을 선택해주세요.");
+      return;
+    }
+
+    if (!canPay) {
+      alert("약관에 동의해주세요.");
+      return;
+    }
+
     try {
-      await paymentWidgetRef.current.requestPayment({
+      const result = await widgetsRef.current.requestPayment({
         orderId,
         orderName,
-        successUrl: `${window.location.origin}/success`,
-        failUrl: `${window.location.origin}/fail`,
         customerEmail,
         customerName,
+        customerMobilePhone: customerPhone,
+        successUrl: `http://localhost:3000/success`,
+        failUrl: `http://localhost:3000/fail`,
       });
+
+      console.log("결제 요청 성공:", result);
+      
+      if (onSuccess) {
+        onSuccess(result);
+      }
     } catch (error) {
       console.error("결제 요청 실패:", error);
       onFail(error);
@@ -158,29 +255,55 @@ export default function TossPayment({
 
   return (
     <div className="space-y-6">
-      {/* 결제 수단 선택 */}
+      {/* 결제 수단 선택 위젯 */}
       <div>
-        <h3 className="text-lg font-medium mb-4">결제 수단</h3>
-        <div id="payment-method" className="border border-gray-200 rounded-lg p-4"></div>
+        <h4 className="text-md font-medium mb-3">결제 수단 선택</h4>
+        <div id="payment-method-widget" className="min-h-[200px] border border-gray-200 rounded-lg p-4">
+          {!isPaymentReady && (
+            <div className="flex items-center justify-center h-full">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-black mr-2"></div>
+              <span className="text-sm text-gray-600">결제 수단을 불러오는 중...</span>
+            </div>
+          )}
+        </div>
+        {selectedPaymentMethod && (
+          <div className="mt-2 text-sm text-green-600">
+            ✓ 선택된 결제 수단: {selectedPaymentMethod.name || selectedPaymentMethod.code}
+          </div>
+        )}
       </div>
 
-      {/* 이용약관 */}
+      {/* 약관 동의 위젯 */}
       <div>
-        <h3 className="text-lg font-medium mb-4">이용약관</h3>
-        <div id="agreement" className="border border-gray-200 rounded-lg p-4"></div>
+        <h4 className="text-md font-medium mb-3">약관 동의</h4>
+        <div id="agreement-widget" className="min-h-[100px] border border-gray-200 rounded-lg p-4">
+          {!isAgreementReady && (
+            <div className="flex items-center justify-center h-full">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-black mr-2"></div>
+              <span className="text-sm text-gray-600">약관을 불러오는 중...</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 결제 버튼 */}
       <button
         onClick={handlePayment}
-        disabled={!isPaymentReady}
+        disabled={!isPaymentReady || !selectedPaymentMethod || !canPay}
         className={`w-full py-3 px-6 rounded-lg font-medium transition-colors ${
-          isPaymentReady
+          isPaymentReady && selectedPaymentMethod && canPay
             ? "bg-black text-white hover:bg-gray-800"
             : "bg-gray-300 text-gray-500 cursor-not-allowed"
         }`}
       >
-        {isPaymentReady ? "결제하기" : "결제 준비 중..."}
+        {!isPaymentReady 
+          ? "결제 준비 중..." 
+          : !selectedPaymentMethod
+            ? "결제 수단을 선택해주세요"
+            : !canPay 
+              ? "약관에 동의해주세요" 
+              : "결제하기"
+        }
       </button>
 
       {/* 결제 금액 정보 */}
